@@ -8,14 +8,15 @@ import {
     markBookAsDeleted,
     updateBook,
     restoreBook,
-    getDeletedBookById
+    getDeletedBookById,
+    getDashboardTotals
 } from "../repositories/book.repository";
 import {
     createBookValidation,
     getBookByIdValidation,
 } from "../validations/book.validation";
 import { BookCreate } from "../models/book-create";
-import { Book } from "@prisma/client";
+import { BookUpdate } from "../models/book-update";
 
 /**
  * POST /books
@@ -48,9 +49,13 @@ export const create: RequestHandler<
  * @returns 200 - Books successfully retrieved with json body of all books
  * @returns {Error} 500 - Internal Server Error
  */
-export const getAll: RequestHandler = async (_, res, next) => {
+export const getAll: RequestHandler = async (req, res, next) => {
     try {
-        const books = await getAllBooks();
+        const take = Number(req.query.take) || 10;
+        const page = ((Number(req.query.page) - 1) || 0) * take;
+        const query = req.query.query as string || "";
+        
+        const books = await getAllBooks(page, take, query);
         return res.status(200).send(books);
     } catch (err) {
         return next(err);
@@ -145,13 +150,13 @@ export const markAsDeleted: RequestHandler<{ id: string }> = async (
  * @summary Update book by id
  * @tags books
  * @param {number} id.path.required - Book id
- * @param {BookCreate} request.body.required - Book info
+ * @param {BookUpdate} request.body.required - Book info
  * @returns 200 - Book successfully updated with json body of the book
  * @returns {Error} 400 - Bad request
  * @returns {Error} 404 - Book not found
  * @returns {Error} 500 - Internal Server Error
  */
-export const update: RequestHandler<{ id: string }, unknown, Book> = async (
+export const update: RequestHandler<{ id: string }, unknown, BookUpdate> = async (
     req,
     res,
     next,
@@ -194,6 +199,73 @@ export const restore: RequestHandler<{ id: string }> = async (
 
         await restoreBook(id);
         return res.status(200).send(book);
+    } catch (err) {
+        return next(err);
+    }
+};
+
+/**
+ * DELETE /books/trash/{id}
+ * @summary Delete book by id
+ * @tags books
+ * @param {number} id.path.required - Book id
+ * @returns 204 - Book successfully deleted
+ * @returns {Error} 400 - Bad request
+ * @returns {Error} 404 - Book not found
+ * @returns {Error} 500 - Internal Server Error
+ */
+export const deleteById: RequestHandler<{ id: string }> = async (
+    req,
+    res,
+    next,
+) => {
+    try {
+        const { id } = await getBookByIdValidation.validate(req.params);
+        const book = id && (await getDeletedBookById(id));
+        if (!book) {
+            return res.status(404).send({ message: "Book not found" });
+        }
+
+        await deleteBook(id);
+        return res.status(204).send();
+    } catch (err) {
+        return next(err);
+    }
+};
+
+/**
+ * GET /books/trash/deleted
+ * @summary Get all deleted books
+ * @tags books
+ * @returns 200 - Books successfully retrieved with json body of all books
+ * @returns {Error} 500 - Internal Server Error
+ */
+export const getAllDeleted: RequestHandler = async (req, res, next) => {
+    try {
+        const take = Number(req.query.take) || 10;
+        const page = ((Number(req.query.page) - 1) || 0) * take;
+        const query = req.query.query as string || "";
+        
+        const books = await getAllBooks(page, take, query, true);
+        return res.status(200).send(books);
+    } catch (err) {
+        return next(err);
+    }
+};
+
+
+/**
+ * GET /books/dashboard/totals
+ * @summary Get total of books
+ * @tags books
+ * @returns 200 - Books successfully retrieved with json body of totals of books
+ * @returns {Error} 500 - Internal Server Error
+ */
+export const getTotals: RequestHandler = async (_req, res, next) => {
+    try {
+        
+        const data = await getDashboardTotals();
+        return res.status(200).send(data);
     } catch (err) {
         return next(err);
     }

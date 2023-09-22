@@ -14,5 +14,6 @@ export const uniqueConstraintErrorHandler: ErrorRequestHandler = (
             message: `Unique constraint failed for ${err?.meta?.target}`,
         });
     }
+    
     return next(err);
 };

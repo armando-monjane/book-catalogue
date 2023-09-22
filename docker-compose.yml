@@ -1,5 +1,19 @@
 version: '3'
 services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: db
+    ports:
+      - "1433:1433"
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=Password123!
+      - MSSQL_PID=Developer
+    restart: always
+    volumes:
+      - ./db-data:/var/lib/mssql/data
+    networks:
+      - express-mssql
   web:
       container_name: web
       build: 
@@ -23,25 +37,10 @@ services:
     ports:
       - "5000:5000"
     depends_on:
-      - db-sql-server
+      - db
     networks:
       - express-mssql
       - react-express
-
-  db-sql-server:
-    image: mcr.microsoft.com/mssql/server:2019-latest
-    container_name: db-sql-server
-    ports:
-      - "1433:1433"
-    environment:
-      - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=Password123!
-      - MSSQL_PID=Developer
-    restart: always
-    volumes:
-      - ./db-data:/var/lib/mssql/data
-    networks:
-      - express-mssql
 
 networks:
   react-express:

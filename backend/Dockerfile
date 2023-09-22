@@ -10,6 +10,8 @@ RUN apt-get -qy update && apt-get -qy install openssl
 
 RUN npm ci
 
+COPY .env.example .env
+
 COPY . /usr/src/app
 
 RUN npx prisma generate --schema ./prisma/schema.prisma

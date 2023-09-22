@@ -18,20 +18,6 @@ CREATE TABLE [dbo].[Book] (
     CONSTRAINT [Book_isbn_key] UNIQUE NONCLUSTERED ([isbn])
 );
 
--- CreateTable
-CREATE TABLE [dbo].[User] (
-    [id] INT NOT NULL IDENTITY(1,1),
-    [email] NVARCHAR(1000) NOT NULL,
-    [username] NVARCHAR(1000) NOT NULL,
-    [name] NVARCHAR(1000),
-    [password] NVARCHAR(1000) NOT NULL,
-    [createdAt] DATETIME2 NOT NULL CONSTRAINT [User_createdAt_df] DEFAULT CURRENT_TIMESTAMP,
-    [updatedAt] DATETIME2 NOT NULL,
-    CONSTRAINT [User_pkey] PRIMARY KEY CLUSTERED ([id]),
-    CONSTRAINT [User_email_key] UNIQUE NONCLUSTERED ([email]),
-    CONSTRAINT [User_username_key] UNIQUE NONCLUSTERED ([username])
-);
-
 COMMIT TRAN;
 
 END TRY

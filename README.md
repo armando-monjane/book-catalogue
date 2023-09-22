@@ -10,10 +10,10 @@ This section explains how to get the app running. In order to run the app on you
 
 ### 2. Having all containers up and running, if running the app for the first time, run the migration to create the datbase by executing `cd backend && make migrate`
 
-### 3. The app should be ready to access at [localhost:3000](http:localhost:3000]
+### 3. The app should be ready to access at [localhost:3000](http://localhost:3000)
 
  ## Backend
- The backend should be available at [localhost:5000/api](http:localhost:5000/api]
+ The backend should be available at [http:localhost:5000/api](http:localhost:5000/api)
 
  ## Frontend
- The frontend should be available at [localhost:3000](http:localhost:3000/api]
+ The frontend should be available at [localhost:3000](http:localhost:3000/api)

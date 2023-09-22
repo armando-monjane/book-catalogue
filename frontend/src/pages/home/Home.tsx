@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Box, Card, CardContent, Grid, Typography } from '@mui/material';
-import { ListToolbar } from '../../shared/components';
+import { ListToolbar, SnackBarAlert } from '../../shared/components';
 import { BaseLayout } from '../../shared/layouts';
 import { BooksService } from '../../shared/services/api/books/BooksService';
 import { useNavigate } from 'react-router-dom';
+import { useShowSnackbar } from '../../shared/hooks';
 
 export const Home = () => {
 	const [isLoading, setIsLoading] = useState(true);
@@ -11,6 +12,7 @@ export const Home = () => {
 	const [totalBooks, setTotalBooks] = useState(0);
 	const [totalAddedCurrentMonth, setTotalAddedCurrentMonth] = useState(0);
 	const [totalToBeDiscarded, setTotalToBeDiscarded] = useState(0);
+	const [snackbarOpen, snackbarMessage, snackbarSeverity, openSnackbar, closeSnackbar] = useShowSnackbar();
 
 	const navigate = useNavigate();
 
@@ -21,7 +23,7 @@ export const Home = () => {
 			setIsLoading(false);
 
 			if (result instanceof Error) {
-				alert(result.message);
+				openSnackbar(result.message, 'error');
 			} else {
 				setTotalBooks(result.totalInBookshelf);
 				setTotalAddedCurrentMonth(result.totalAddedCurrentMonth);
@@ -110,6 +112,13 @@ export const Home = () => {
 						</Grid>
 					</Grid>
 				</Grid>
+
+				<SnackBarAlert
+					open={snackbarOpen}
+					message={snackbarMessage}
+					severity={snackbarSeverity}
+					onClose={closeSnackbar}
+				/>
 			</Box>
 		</BaseLayout>
 	);

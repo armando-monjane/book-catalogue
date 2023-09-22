@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
 	Icon,
 	IconButton,
@@ -14,24 +14,15 @@ import {
 	TableRow,
 } from '@mui/material';
 import { useSearchParams } from 'react-router-dom';
-
-import {
-	BooksService,
-} from '../../shared/services/api/books/BooksService';
 import { BaseLayout } from '../../shared/layouts';
-import { Book } from '../../shared/models/book';
 import { Environment } from '../../shared/environment';
-import { useDebounce } from '../../shared/hooks';
-import { ListToolbar } from '../../shared/components';
+import { useFetchBooks, useSaveBook, useShowSnackbar } from '../../shared/hooks';
+import { ConfirmDialog, ListToolbar, SnackBarAlert } from '../../shared/components';
 
 export const Trash: React.FC = () => {
 	const [searchParams, setSearchParams] = useSearchParams();
-	const { debounce } = useDebounce();
-
-	const [rows, setRows] = useState<Book[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
-	const [totalCount, setTotalCount] = useState(0);
-
+	const [snackbarOpen, snackbarMessage, snackbarSeverity, openSnackbar, closeSnackbar] = useShowSnackbar();
+	const [isSaving, , , , , handleDeleteBookFromTrash, handleRestoreBook]= useSaveBook();
 	const query = useMemo(() => {
 		return searchParams.get('query') || '';
 	}, [searchParams]);
@@ -40,51 +31,52 @@ export const Trash: React.FC = () => {
 		return Number(searchParams.get('page') || '1');
 	}, [searchParams]);
 
-	useEffect(() => {
-		setIsLoading(true);
+	const [books, totalCount, isLoading, , setBooks] = useFetchBooks(query, page, true); 
+	const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+	const [confirmDialogValue, setConfirmDialogValue] = useState<number | string>('');
+	const [isRestoring, setIsRestoring] = useState(false);
 
-		debounce(() => {
-			BooksService.getAllDeleted(page, query).then((result) => {
-				setIsLoading(false);
-
-				if (result instanceof Error) {
-					alert(result.message);
-				} else {
-					setTotalCount(result.totalCount);
-					setRows(result.books);
-				}
-			});
-		});
-	}, [query, page]);
-
-	const handleDelete = (id: number) => {
-		if (confirm('Delete registry?')) {
-			BooksService.deleteFromTrash(id).then((result) => {
-				if (result instanceof Error) {
-					alert(result.message);
-				} else {
-					setRows((oldRows) => [
-						...oldRows.filter((oldRow) => oldRow.id !== id),
-					]);
-					alert('Registry deleted successfully!');
-				}
-			});
-		}
+	const handleOnDeleteClick = (id: number) => {
+		setConfirmDialogValue(Number(id));
+		setConfirmDialogOpen(true);
 	};
 
-	const handleRestore = (id: number) => {
-		if (confirm('Restore registry?')) {
-			BooksService.restoreFromTrash(id).then((result) => {
-				if (result instanceof Error) {
-					alert(result.message);
-				} else {
-					setRows((oldRows) => [
-						...oldRows.filter((oldRow) => oldRow.id !== id),
-					]);
-					alert('Registry restored successfully!');
+	const handleDelete = (id?: string | number) => {
+		setConfirmDialogOpen(false);
+		if (!id) return;
+
+		handleDeleteBookFromTrash(Number(id))
+			.then(() => {
+				openSnackbar('Registry deleted sucessfully', 'success');
+				if (books) {
+					setBooks((prevBooks) => prevBooks ? prevBooks.filter((book) => book.id !== Number(id)) : []);
 				}
+			})
+			.catch((error: Error) => {
+				openSnackbar(error.message, 'error');
 			});
-		}
+	};
+
+	const handleOnRestoreClick = (id: number) => {
+		setIsRestoring(true);
+		setConfirmDialogOpen(true);
+		setConfirmDialogValue(Number(id));
+	};
+
+	const handleRestore = (id?: string | number) => {
+		setConfirmDialogOpen(false);
+		if (!id) return;
+
+		handleRestoreBook(Number(id))
+			.then(() => {
+				openSnackbar('Registry restored sucessfully', 'success');
+				if (books) {
+					setBooks((prevBooks) => prevBooks ? prevBooks.filter((book) => book.id !== Number(id)) : []);
+				}
+			})
+			.catch((error: Error) => {
+				openSnackbar(error.message, 'error');
+			});		
 	};
 
 	return (
@@ -118,7 +110,7 @@ export const Trash: React.FC = () => {
 						</TableRow>
 					</TableHead>
 					<TableBody>
-						{rows.map((row) => (
+						{books?.map((row) => (
 							<TableRow key={row.id}>
 								<TableCell>{row.id}</TableCell>
 								<TableCell>{row.title}</TableCell>
@@ -128,11 +120,11 @@ export const Trash: React.FC = () => {
 								<TableCell>
 									<IconButton
 										size="small"
-										onClick={() => handleRestore(row.id)}
+										onClick={() => handleOnRestoreClick(row.id)}
 									>
 										<Icon>restore</Icon>
 									</IconButton>
-									<IconButton size="small" onClick={() => handleDelete(row.id)}>
+									<IconButton size="small" onClick={() => handleOnDeleteClick(row.id)}>
 										<Icon>delete_forever</Icon>
 									</IconButton>
 								</TableCell>
@@ -140,19 +132,19 @@ export const Trash: React.FC = () => {
 						))}
 					</TableBody>
 
-					{totalCount === 0 && !isLoading && (
+					{totalCount === 0 && !isLoading && !isSaving && (
 						<caption>{Environment.EMPTY_LIST}</caption>
 					)}
 
 					<TableFooter>
-						{isLoading && (
+						{(isLoading || isSaving) && (
 							<TableRow>
 								<TableCell colSpan={3}>
 									<LinearProgress variant="indeterminate" />
 								</TableCell>
 							</TableRow>
 						)}
-						{totalCount > 0 && totalCount > Environment.LIMIT_ROWS && (
+						{totalCount && totalCount > 0 && totalCount > Environment.LIMIT_ROWS && (
 							<TableRow>
 								<TableCell colSpan={3}>
 									<Pagination
@@ -171,6 +163,31 @@ export const Trash: React.FC = () => {
 					</TableFooter>
 				</Table>
 			</TableContainer>
+
+			<SnackBarAlert
+				open={snackbarOpen}
+				message={snackbarMessage}
+				severity={snackbarSeverity}
+				onClose={closeSnackbar}
+			/>
+
+			{!isRestoring && (<ConfirmDialog
+				keepMounted
+				open={confirmDialogOpen}
+				onClose={handleDelete}
+				value={confirmDialogValue}
+				title="Delete Book"
+				message="Are you sure you want to delete this registry from trash? This action is ireversible"
+			/>)}
+
+			{isRestoring && (<ConfirmDialog
+				keepMounted
+				open={confirmDialogOpen}
+				onClose={handleRestore}
+				value={confirmDialogValue}
+				title="Restore Book"
+				message="Are you sure you want to restore this registry from trash?"
+			/>)}
 		</BaseLayout>
 	);
 };

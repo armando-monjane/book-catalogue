@@ -20,8 +20,6 @@ const getAll = async (page = 1, filter = ''): Promise<TBooksWithTotalCount | Err
 
 		const { data } = await Api.get(url);
 
-		console.log(data);
-
 		if (data) {
 			return data;
 		}

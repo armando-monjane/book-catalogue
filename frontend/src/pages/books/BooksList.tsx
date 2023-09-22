@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
 	Icon,
 	IconButton,
@@ -14,24 +14,15 @@ import {
 	TableRow,
 } from '@mui/material';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-
-import {
-	BooksService,
-} from '../../shared/services/api/books/BooksService';
 import { BaseLayout } from '../../shared/layouts';
-import { Book } from '../../shared/models/book';
 import { Environment } from '../../shared/environment';
-import { useDebounce } from '../../shared/hooks';
-import { ListToolbar } from '../../shared/components';
+import { useFetchBooks, useSaveBook, useShowSnackbar } from '../../shared/hooks';
+import { ConfirmDialog, ListToolbar, SnackBarAlert } from '../../shared/components';
 
 export const BooksList: React.FC = () => {
 	const [searchParams, setSearchParams] = useSearchParams();
-	const { debounce } = useDebounce();
 	const navigate = useNavigate();
-
-	const [rows, setRows] = useState<Book[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
-	const [totalCount, setTotalCount] = useState(0);
+	const [snackbarOpen, snackbarMessage, snackbarSeverity, openSnackbar, closeSnackbar] = useShowSnackbar();
 
 	const query = useMemo(() => {
 		return searchParams.get('query') || '';
@@ -40,37 +31,31 @@ export const BooksList: React.FC = () => {
 	const page = useMemo(() => {
 		return Number(searchParams.get('page') || '1');
 	}, [searchParams]);
+	
+	const [books, totalCount, isLoading, , setBooks] = useFetchBooks(query, page);
+	const [isSaving, , , , handleDeleteBook]= useSaveBook(); 
+	const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+	const [confirmDialogValue, setConfirmDialogValue] = useState<number | string>('');
 
-	useEffect(() => {
-		setIsLoading(true);
+	const handleOnDeleteClick = (id: number) => {
+		setConfirmDialogValue(id);
+		setConfirmDialogOpen(true);
+	};
 
-		debounce(() => {
-			BooksService.getAll(page, query).then((result) => {
-				setIsLoading(false);
+	const handleDelete = (id?: number | string) => {
+		setConfirmDialogOpen(false);
 
-				if (result instanceof Error) {
-					alert(result.message);
-				} else {
-					setTotalCount(result.totalCount);
-					setRows(result.books);
+		if (!id) return;
+		handleDeleteBook(Number(id))
+			.then(() => {
+				openSnackbar('Registry deleted sucessfully', 'success');
+				if (books) {
+					setBooks((prevBooks) => prevBooks ? prevBooks.filter((book) => book.id !== Number(id)) : []);
 				}
+			})
+			.catch((error: Error) => {
+				openSnackbar(error.message, 'error');
 			});
-		});
-	}, [query, page]);
-
-	const handleDelete = (id: number) => {
-		if (confirm('Delete registry?')) {
-			BooksService.deleteById(id).then((result) => {
-				if (result instanceof Error) {
-					alert(result.message);
-				} else {
-					setRows((oldRows) => [
-						...oldRows.filter((oldRow) => oldRow.id !== id),
-					]);
-					alert('Registry deleted successfully!');
-				}
-			});
-		}
 	};
 
 	return (
@@ -103,7 +88,7 @@ export const BooksList: React.FC = () => {
 						</TableRow>
 					</TableHead>
 					<TableBody>
-						{rows.map((row) => (
+						{books?.map((row) => (
 							<TableRow key={row.id}>
 								<TableCell>{row.id}</TableCell>
 								<TableCell>{row.title}</TableCell>
@@ -116,7 +101,7 @@ export const BooksList: React.FC = () => {
 									>
 										<Icon>edit</Icon>
 									</IconButton>
-									<IconButton size="small" onClick={() => handleDelete(row.id)}>
+									<IconButton size="small" onClick={() => handleOnDeleteClick(row.id)}>
 										<Icon>delete</Icon>
 									</IconButton>
 								</TableCell>
@@ -124,12 +109,12 @@ export const BooksList: React.FC = () => {
 						))}
 					</TableBody>
 
-					{totalCount === 0 && !isLoading && (
+					{totalCount === 0 && !isLoading && !isSaving && (
 						<caption>{Environment.EMPTY_LIST}</caption>
 					)}
 
 					<TableFooter>
-						{isLoading && (
+						{(isLoading || isSaving) && (
 							<TableRow>
 								<TableCell colSpan={3}>
 									<LinearProgress variant="indeterminate" />
@@ -155,6 +140,22 @@ export const BooksList: React.FC = () => {
 					</TableFooter>
 				</Table>
 			</TableContainer>
+
+			<SnackBarAlert
+				open={snackbarOpen}
+				message={snackbarMessage}
+				severity={snackbarSeverity}
+				onClose={closeSnackbar}
+			/>
+
+			<ConfirmDialog
+				keepMounted
+				open={confirmDialogOpen}
+				onClose={handleDelete}
+				value={confirmDialogValue}
+				title='Delete Book'
+				message='Are you sure you want to delete this registry?'
+			/>
 		</BaseLayout>
 	);
 };

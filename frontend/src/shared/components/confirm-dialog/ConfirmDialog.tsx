@@ -20,10 +20,8 @@ export const ConfirmDialog = (props: ConfirmDialogProps) => {
 	const [value, setValue] = useState<number | string>();
 
 	useEffect(() => {
-		if (!open) {
-			setValue(valueProp);
-		}
-	}, [valueProp, open]);
+		setValue(valueProp);
+	}, [valueProp]);
 
 	const handleCancel = () => {
 		onClose();
